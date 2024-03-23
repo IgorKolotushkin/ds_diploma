@@ -163,24 +163,6 @@ def categorical_inputer(df):
     return df_copy
 
 
-class InputerTransformer(TransformerMixin):
-
-    def __init__(self):
-        super().__init__()
-
-    def fit(self, X, y=None):
-        self.X = X
-
-        return self
-
-    def transform(self, X, y=None):
-
-        Xp = pd.DataFrame(X)
-        Xdrop = Xp.dropna().to_numpy()
-
-        return Xdrop
-
-
 def main():
     print('Prediction Pipeline')
 
@@ -212,7 +194,7 @@ def main():
 
     categorical_transformer = Pipeline(
         steps=[
-            ('imputer', categorical_inputer),
+            ('imputer', FunctionTransformer(categorical_inputer)),
             ('encoder', OneHotEncoder(handle_unknown='ignore')),
         ]
     )
