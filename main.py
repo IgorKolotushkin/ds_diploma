@@ -63,24 +63,37 @@ def categorical_inputer(df):
         'mobile',
         'tablet',
     ]
+
+    basic_brands = [
+        'Apple',
+        'Samsung',
+        'Xiaomi',
+        'Huawei',
+        'Realme',
+        'OPPO',
+        'Vivo'
+        'other_brand',
+    ]
+
+    basic_os = [
+        'Android',
+        'iOS',
+        'Windows',
+        'Macintosh',
+        'Linux',
+        'other_os'
+    ]
+
     df_copy.loc[
-        (df_copy['device_brand'] == 'Huawei') & (df_copy['device_category'] == 'desktop'), 'device_category'
+        (df_copy['device_brand'].isin(['Huawei', 'Samsung'])) & (df_copy['device_category'] == 'desktop'), 'device_category'
     ] = 'mobile'
+
     df_copy.loc[
-        (df_copy['device_brand'] == 'Samsung') & (df_copy['device_category'] == 'desktop'), 'device_category'
-    ] = 'mobile'
-    for device in device_list:
-        df_copy.loc[
-            (df_copy['device_brand'] == 'Xiaomi') & (df_copy['device_os'].isna()) & (df_copy['device_category'] == device), 'device_os'
-        ] = 'Android'
-        df_copy.loc[
-            (df_copy['device_brand'] == 'Huawei') & (df_copy['device_os'].isna()) & (df_copy['device_category'] == device), 'device_os'
-        ] = 'Android'
-        df_copy.loc[
-            (df_copy['device_brand'] == 'Samsung') & (df_copy['device_os'].isna()) & (df_copy['device_category'] == device), 'device_os'
-        ] = 'Android'
+        (df_copy['device_brand'].isin(['Xiaomi', 'Huawei', 'Samsung'])) & (df_copy['device_os'].isna()) & (df_copy['device_category'].isin(device_list)), 'device_os'
+    ] = 'Android'
+
     df_copy.loc[
-        (df_copy['device_brand'] == 'Apple') & (df_copy['device_category'].isin(['mobile', 'tablet'])) & (df_copy['device_os'].isna()), 'device_os'
+        (df_copy['device_brand'] == 'Apple') & (df_copy['device_category'].isin(device_list)) & (df_copy['device_os'].isna()), 'device_os'
     ] = 'iOS'
     df_copy.loc[
         (df_copy['device_brand'] == 'Apple') & (df_copy['device_category'] == 'desktop') & (df_copy['device_os'].isna()), 'device_os'
@@ -95,20 +108,16 @@ def categorical_inputer(df):
         (df_copy['device_brand'].isna()) & (df_copy['device_os'] == 'Macintosh'), 'device_brand'
     ] = 'Apple'
     df_copy.loc[
-        (df_copy['device_brand'].isna()) & (df_copy['device_os'] == '(not set)') & (df_copy['device_category'] == 'desktop'), 'device_brand'
+        (df_copy['device_brand'].isna()) & (df_copy['device_os'].isin(['(not set)', 'Chrome OS'])) & (df_copy['device_category'] == 'desktop'), 'device_brand'
     ] = 'other_brand'
-    df_copy.loc[
-        (df_copy['device_brand'].isna()) & (df_copy['device_os'] == 'Chrome OS') & (df_copy['device_category'] == 'desktop'), 'device_brand'
-    ] = 'other_brand'
+
     df_copy.loc[
         (df_copy['device_brand'].notna()) & (df_copy['device_os'] == '(not set)') & (df_copy['device_category'] == 'mobile'), 'device_os'
     ] = 'Android'
     df_copy.loc[
-        (df_copy['device_brand'].notna()) & (df_copy['device_os'].isna()) & (df_copy['device_category'] == 'mobile'), 'device_os'
+        (df_copy['device_brand'].notna()) & (df_copy['device_os'].isna()) & (df_copy['device_category'].isin(device_list)), 'device_os'
     ] = 'Android'
-    df_copy.loc[
-        (df_copy['device_brand'].notna()) & (df_copy['device_os'].isna()) & (df_copy['device_category'] == 'tablet'), 'device_os'
-    ] = 'Android'
+
     df_copy.loc[
         (df_copy['device_brand'].notna()) & (df_copy['device_os'].isna()) & (df_copy['device_category'] == 'desktop'), 'device_os'
     ] = 'Windows'
@@ -116,30 +125,11 @@ def categorical_inputer(df):
         (df_copy['device_brand'].notna()) & (df_copy['device_os'].isna()), 'device_os'
     ] = 'Android'
 
-    basic_os = [
-        'Android',
-        'iOS',
-        'Windows',
-        'Macintosh',
-        'Linux',
-        'other_os'
-    ]
-
-    other_os_list = [i_os for i_os in df_copy['device_os'].values if i_os not in basic_os]
+    other_os_list = [os for os in df_copy['device_os'].values if os not in basic_os]
     df_copy['device_os'] = df_copy['device_os'].replace(other_os_list, 'other_os')
 
     df_copy.loc[(df_copy['device_brand'].isna()), 'device_brand'] = 'other_brand'
 
-    basic_brands = [
-        'Apple',
-        'Samsung',
-        'Xiaomi',
-        'Huawei',
-        'Realme',
-        'OPPO',
-        'Vivo'
-        'other_brand',
-    ]
 
     other_brands = [brand for brand in df_copy['device_brand'].values if brand not in basic_brands]
     df_copy['device_brand'] = df_copy['device_brand'].replace(list(set(other_brands)), 'other_brand')
@@ -166,7 +156,7 @@ def categorical_inputer(df):
 def main():
     print('Prediction Pipeline')
 
-    df = pd.read_csv('data/clean_df.csv').drop(columns=['session_id', 'client_id'], axis=1)
+    df = pd.read_csv('data/df_with_target.csv').drop(columns=['session_id', 'client_id'], axis=1)
 
     X = df.drop('target_action', axis=1)
     y = df['target_action']
@@ -187,7 +177,6 @@ def main():
 
     numerical_transformer = Pipeline(
         steps=[
-            # ('imputer', SimpleImputer(strategy='median')),
             ('scaler', StandardScaler()),
         ]
     )
@@ -208,13 +197,30 @@ def main():
     )
 
     models = (
-        LogisticRegression(solver='liblinear'),
-        RandomForestClassifier(),
-        SVC(),
+        LogisticRegression(
+            C=4,
+            max_iter=150,
+            random_state=42,
+            solver='liblinear',
+            class_weight='balanced',
+        ),
+        RandomForestClassifier(
+            n_estimators=150, 
+            min_samples_split=3, 
+            bootstrap=False, 
+            random_state=42, 
+            max_depth=80,
+            class_weight='balanced',
+        ),
+        SVC(
+            random_state=42,
+            class_weight='balanced',
+        ),
     )
 
     best_score = .0
     best_pipe = None
+    best_roc = None
     for model in models:
         pipe = Pipeline(
             steps=[
