@@ -10,6 +10,7 @@ from sklearn.model_selection import cross_val_score
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
+from sklearn.utils import resample
 
 
 def delete_columns(df):
@@ -159,10 +160,26 @@ def categorical_inputer(df):
     return df_copy
 
 
+def balance_dataframe(df):
+    target_0 = df[df.target_action == 0]
+    target_1 = df[df.target_action == 1]
+
+    target_0_downsampled = resample(
+        target_0,
+        replace=False,
+        n_samples=len(target_1),
+        random_state=27,
+    )
+
+    return pd.concat([target_0_downsampled, target_1])
+
+
 def main():
     print('Prediction Pipeline')
 
     df = pd.read_csv('data/df_with_target.csv').drop(columns=['session_id', 'client_id'], axis=1)
+
+    df = balance_dataframe(df)
 
     X = df.drop('target_action', axis=1)
     y = df['target_action']
@@ -180,6 +197,12 @@ def main():
             ('del_outliers', FunctionTransformer(delete_outliers)),
         ]
     )
+
+    # balance_df = Pipeline(
+    #     steps=[
+    #         ('balance', FunctionTransformer(balance_dataframe))
+    #     ]
+    # )
 
     numerical_transformer = Pipeline(
         steps=[
@@ -203,47 +226,40 @@ def main():
     )
 
     models = (
-        LogisticRegression(
-            C=4,
-            max_iter=150,
-            random_state=42,
-            solver='liblinear',
-            class_weight='balanced',
-        ),
-        RandomForestClassifier(
-            n_estimators=150,
-            min_samples_split=3,
-            bootstrap=False,
-            random_state=42,
-            max_depth=80,
-            class_weight='balanced',
-        ),
-        SVC(
-            random_state=42,
-            class_weight='balanced',
-        ),
+        # LogisticRegression(
+        #     C=4,
+        #     max_iter=150,
+        #     random_state=42,
+        #     solver='liblinear',
+        # ),
+        RandomForestClassifier(),
+        # SVC(
+        #     random_state=42,
+        # ),
     )
 
     best_score = .0
     best_pipe = None
-    best_roc = None
     for model in models:
         pipe = Pipeline(
             steps=[
                 ('filtering', filter_features),
                 ('preprocessor', preprocessor),
+                # ('balancer', balance_df),
                 ('classifier', model),
-            ])
+            ]
+        )
 
-        score = cross_val_score(pipe, X, y, cv=4, scoring='accuracy')
+        score = cross_val_score(pipe, X, y, cv=4, scoring='roc_auc')  # scoring='roc_auc' scoring='accuracy'
 
         print(f'model: {type(model).__name__}, acc_mean: {score.mean():.4f}, acc_std: {score.std():.4f}')
 
-        if score.mean() > best_score:
-            best_score = score.mean()
-            best_pipe = pipe
+        best_pipe = pipe
+        # if score.mean() > best_score:
+        #     best_score = score.mean()
+        #     best_pipe = pipe
 
-    print(f'best model: {type(best_pipe.named_steps["classifier"]).__name__}, accuracy: {best_score:.4f}')
+    # print(f'best model: {type(best_pipe.named_steps["classifier"]).__name__}, accuracy: {best_score:.4f}')
     joblib.dump(best_pipe, 'model_pipe.pkl')
 
 
